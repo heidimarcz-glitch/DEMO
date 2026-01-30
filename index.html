@@ -497,18 +497,7 @@
         let previewImageData = null;
 
         async function initApp() {
-            // Check if storage is available
-            if (!window.storage) {
-                document.getElementById('categories').innerHTML = `
-                    <div style="background: white; padding: 20px; border-radius: 12px; text-align: center;">
-                        <p style="color: #e74c3c; margin-bottom: 10px;">⚠️ Storage is not available</p>
-                        <p style="color: #666;">Please make sure you're viewing this in Claude's artifact viewer.</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            await renderCategories();
+            renderCategories();
         }
 
         async function renderCategories() {
@@ -529,36 +518,24 @@
         }
 
         async function getPhotos(categoryId) {
-            if (!window.storage) {
-                return [];
-            }
-
             try {
                 const indexKey = `index:${categoryId}`;
-                let indexResult;
+                const indexData = localStorage.getItem(indexKey);
                 
-                try {
-                    indexResult = await window.storage.get(indexKey);
-                } catch (e) {
-                    // Key doesn't exist yet - this is normal for new categories
+                if (!indexData) {
                     return [];
                 }
                 
-                if (!indexResult || !indexResult.value) {
-                    return [];
-                }
-                
-                const photoIds = JSON.parse(indexResult.value);
+                const photoIds = JSON.parse(indexData);
                 const photos = [];
                 
                 for (const photoId of photoIds) {
                     try {
-                        const data = await window.storage.get(photoId);
-                        if (data && data.value) {
-                            photos.push(JSON.parse(data.value));
+                        const data = localStorage.getItem(photoId);
+                        if (data) {
+                            photos.push(JSON.parse(data));
                         }
                     } catch (e) {
-                        // Photo might have been deleted, skip it
                         continue;
                     }
                 }
@@ -618,23 +595,19 @@
 
             try {
                 // Save the photo
-                await window.storage.set(photoId, JSON.stringify(photoData));
+                localStorage.setItem(photoId, JSON.stringify(photoData));
                 
                 // Update the index
                 const indexKey = `index:${currentCategory.id}`;
                 let photoIds = [];
                 
-                try {
-                    const indexResult = await window.storage.get(indexKey);
-                    if (indexResult && indexResult.value) {
-                        photoIds = JSON.parse(indexResult.value);
-                    }
-                } catch (e) {
-                    // Index doesn't exist yet, that's fine
+                const indexData = localStorage.getItem(indexKey);
+                if (indexData) {
+                    photoIds = JSON.parse(indexData);
                 }
                 
                 photoIds.push(photoId);
-                await window.storage.set(indexKey, JSON.stringify(photoIds));
+                localStorage.setItem(indexKey, JSON.stringify(photoIds));
                 
                 document.getElementById('previewSection').style.display = 'none';
                 document.getElementById('fileInput').value = '';
@@ -680,9 +653,9 @@
 
         async function openShareModal(photoId) {
             try {
-                const data = await window.storage.get(photoId);
-                if (data && data.value) {
-                    photoToShare = JSON.parse(data.value);
+                const data = localStorage.getItem(photoId);
+                if (data) {
+                    photoToShare = JSON.parse(data);
                     document.getElementById('sharePreviewImage').src = photoToShare.imageData;
                     document.getElementById('shareCaptionInput').value = photoToShare.caption || '';
                     document.getElementById('shareModal').classList.add('active');
@@ -721,19 +694,15 @@
 
             try {
                 // Delete the photo
-                await window.storage.delete(photoId);
+                localStorage.removeItem(photoId);
                 
                 // Update the index
                 const indexKey = `index:${currentCategory.id}`;
-                try {
-                    const indexResult = await window.storage.get(indexKey);
-                    if (indexResult && indexResult.value) {
-                        let photoIds = JSON.parse(indexResult.value);
-                        photoIds = photoIds.filter(id => id !== photoId);
-                        await window.storage.set(indexKey, JSON.stringify(photoIds));
-                    }
-                } catch (e) {
-                    console.error('Error updating index:', e);
+                const indexData = localStorage.getItem(indexKey);
+                if (indexData) {
+                    let photoIds = JSON.parse(indexData);
+                    photoIds = photoIds.filter(id => id !== photoId);
+                    localStorage.setItem(indexKey, JSON.stringify(photoIds));
                 }
                 
                 await renderGallery();
@@ -755,4 +724,3 @@
         initApp();
     </script>
 </body>
-</html>
